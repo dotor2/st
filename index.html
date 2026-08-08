@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <!-- منع التكبير والتصغير نهائياً -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ملعب الصقور</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #1e3a29;
+            --secondary: #27ae60;
+            --accent: #f39c12;
+            --bg-color: #f4f7f6;
+            --text-dark: #2c3e50;
+            --text-light: #ecf0f1;
+            --bottom-bar-h: 65px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Tajawal', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            overflow: hidden; /* Prevent body scroll, handle inside containers */
+        }
+
+        /* --- أنميشن البداية (Splash Screen) --- */
+        #splash-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #2c3e50, #000000);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        
+        .stadium-lights {
+            position: absolute;
+            top: 0; width: 100%; height: 100%;
+            background: conic-gradient(from 180deg at 50% 0%, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%);
+            animation: sweep 4s infinite linear;
+        }
+
+        .football-wrapper {
+            position: relative;
+            width: 100px; height: 100px;
+            animation: bounceIn 1.5s cubic-bezier(0.28, 0.84, 0.42, 1) forwards;
+        }
+
+        .football {
+            width: 100%; height: 100%;
+            background: url('https://cdn-icons-png.flaticon.com/512/1086/1086052.png') center/cover;
+            animation: spin 3s linear infinite;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+        }
+
+        .stadium-name {
+            margin-top: 30px;
+            font-size: 3rem;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 0 20px var(--secondary), 0 0 40px var(--secondary);
+            opacity: 0;
+            transform: scale(0.5);
+            animation: textReveal 1.5s 1s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2;
+        }
+
+        @keyframes sweep { 0% { transform: rotate(-20deg); } 50% { transform: rotate(20deg); } 100% { transform: rotate(-20deg); } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes bounceIn { 0% { transform: translateY(-300px) scale(0.5); opacity: 0; } 50% { transform: translateY(20px) scale(1.1); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+        @keyframes textReveal { to { opacity: 1; transform: scale(1); } }
+
+        /* --- التطبيق الأساسي --- */
+        #app-container {
+            display: none; /* يظهر بعد الأنميشن */
+            max-width: 600px;
+            margin: 0 auto;
+            height: 100dvh;
+            background: white;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        /* حاوية الصفحات */
+        .page-container {
+            height: calc(100% - var(--bottom-bar-h));
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 40px;
+            display: none;
+            animation: fadeInPage 0.3s ease;
+        }
+        .page-container.active { display: block; }
+        @keyframes fadeInPage { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* الشريط السفلي */
+        .bottom-bar {
+            position: absolute;
+            bottom: 0; width: 100%; height: var(--bottom-bar-h);
+            background: var(--primary);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .nav-item {
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 50%;
+            height: 100%;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+        }
+        .nav-item.active { color: var(--secondary); font-weight: bold; }
+        .nav-item i { font-size: 1.4rem; margin-bottom: 5px; }
+        .nav-item.active i { transform: translateY(-3px) scale(1.1); }
+        
+        .notification-dot {
+            position: absolute; top: 10px; right: 35%;
+            width: 10px; height: 10px; background: red;
+            border-radius: 50%; display: none;
+            box-shadow: 0 0 8px red;
+            animation: pulseRed 1s infinite;
+        }
+        @keyframes pulseRed { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* --- التصميم المشترك للواجهات --- */
+        .header-title { font-size: 1.5rem; color: var(--primary); margin-bottom: 20px; font-weight: 800; text-align: center; border-bottom: 2px solid var(--secondary); padding-bottom: 10px; }
+        
+        /* قسم الحجز */
+        .date-slider { display: flex; overflow-x: auto; gap: 10px; padding: 10px 0; scrollbar-width: none; }
+        .date-slider::-webkit-scrollbar { display: none; }
+        .date-card { min-width: 80px; padding: 15px 10px; background: #f0f0f0; border-radius: 15px; text-align: center; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .date-card.active { background: var(--secondary); color: white; border-color: var(--primary); transform: scale(1.05); }
+        .date-card .day-name { font-size: 0.9rem; font-weight: bold; }
+        .date-card .day-num { font-size: 1.2rem; }
+
+        .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
+        .time-slot { padding: 12px; background: white; border: 2px solid var(--secondary); border-radius: 10px; text-align: center; font-weight: bold; color: var(--primary); cursor: pointer; transition: 0.2s; }
+        .time-slot.active { background: var(--secondary); color: white; }
+        .time-slot.booked { background: #dcdcdc; border-color: #bdc3c7; color: #7f8c8d; cursor: not-allowed; text-decoration: line-through; }
+
+        .btn-primary { display: block; width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; margin-top: 25px; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .btn-primary:active { transform: scale(0.98); }
+
+        /* نماذج الإدخال */
+        .input-group { margin-top: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--text-dark); }
+        .input-group input, .input-group textarea { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 10px; font-size: 1rem; outline: none; transition: border 0.3s; font-family: inherit; }
+        .input-group input:focus, .input-group textarea:focus { border-color: var(--secondary); }
+        
+        /* شاشات الحالات (تأكيد، موافقة) */
+        .status-screen { text-align: center; padding-top: 30px; display: none; }
+        .status-icon { font-size: 5rem; margin-bottom: 20px; }
+        .status-icon.pending { color: var(--accent); }
+        .status-icon.approved { color: var(--secondary); }
+        .status-box { background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); margin-top: 20px; }
+        .warning-text { color: #e74c3c; font-weight: bold; font-size: 0.9rem; margin-top: 15px; display: block; }
+        
+        /* قسم حسابي */
+        .secret-login-btn { position: absolute; top: 15px; left: 15px; width: 40px; height: 40px; opacity: 0; z-index: 10; cursor: pointer; } /* الزر السري */
+        .account-buttons { display: flex; flex-direction: column; gap: 15px; margin-top: 30px; }
+        .acc-btn { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; background: white; border: 1px solid #eee; border-radius: 15px; font-size: 1.1rem; font-weight: bold; color: var(--text-dark); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: 0.2s; text-decoration: none; }
+        .acc-btn:active { background: #f9f9f9; transform: scale(0.98); }
+        .acc-btn i.left { color: var(--secondary); font-size: 1.3rem; }
+        .acc-btn i.right { color: #ccc; }
+        .acc-btn.admin-only { background: var(--primary); color: white; display: none; }
+        
+        /* صفحات حرة (Free Pages) */
+        .free-page { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); z-index: 200; display: none; overflow-y: auto; padding: 20px; max-width: 600px; left: 50%; transform: translateX(-50%); }
+        .free-page-header { display: flex; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #ddd; }
+        .back-btn { background: none; border: none; font-size: 1.5rem; color: var(--text-dark); cursor: pointer; padding-left: 15px; }
+        .free-page-title { flex-grow: 1; text-align: center; font-size: 1.3rem; font-weight: bold; margin-left: -30px; } /* توسيط بصري */
+
+        /* بطاقات الحجوزات */
+        .booking-card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-right: 5px solid var(--secondary); box-shadow: 0 3px 10px rgba(0,0,0,0.05); }
+        .booking-card.pending { border-right-color: var(--accent); }
+        .booking-card.rejected { border-right-color: #e74c3c; }
+        .booking-card-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
+        .b-label { color: #7f8c8d; }
+        .b-val { font-weight: bold; color: var(--text-dark); }
+        
+        /* النجوم */
+        .star-rating { display: flex; justify-content: center; gap: 10px; font-size: 2.5rem; color: #ccc; margin: 20px 0; direction: rtl; }
+        .star { cursor: pointer; transition: color 0.2s; }
+        .star.active, .star:hover, .star:hover ~ .star { color: #f1c40f; }
+        
+        /* لوحة التحكم */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
+        .dash-box { background: white; border-radius: 15px; padding: 20px 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; transition: 0.2s; border: 1px solid #eee; display: flex; flex-direction: column; align-items: center; justify-content: center;}
+        .dash-box:active { transform: scale(0.95); }
+        .dash-box i { font-size: 2rem; color: var(--primary); margin-bottom: 10px; }
+        .dash-box span { font-size: 0.9rem; font-weight: bold; color: var(--text-dark); }
+        
+        .admin-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-acc { background: var(--secondary); color: white; flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-rej { background: #e74c3c; color: white; flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        /* نافذة تسجيل الدخول */
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.6); z-index: 300; display: none; justify-content: center; align-items: center; }
+        .login-modal { background: white; width: 90%; max-width: 400px; padding: 25px; border-radius: 20px; text-align: center; }
+        .close-modal { float: left; cursor: pointer; font-size: 1.2rem; color: #888; }
+        
+    </style>
+</head>
+<body>
+
+    <!-- 1. شاشة البداية (أنميشن) -->
+    <div id="splash-screen">
+        <div class="stadium-lights"></div>
+        <div class="football-wrapper">
+            <div class="football"></div>
+        </div>
+        <div class="stadium-name">ملعب الصقور</div>
+    </div>
+
+    <!-- 2. التطبيق الأساسي -->
+    <div id="app-container">
+        
+        <!-- قسم الحجز (View) -->
+        <div id="view-booking" class="page-container active">
+            
+            <!-- مرحلة 1: اختيار الوقت -->
+            <div id="step-datetime">
+                <h2 class="header-title">حجز موعد</h2>
+                
+                <h3 style="font-size: 1.1rem; margin-bottom: 10px;">اختر اليوم:</h3>
+                <div class="date-slider" id="date-slider">
+                    <!-- Dates generated by JS -->
+                </div>
+
+                <h3 style="font-size: 1.1rem; margin-top: 20px; margin-bottom: 10px;">اختر الساعة:</h3>
+                <div class="time-grid" id="time-grid">
+                    <!-- Times generated by JS -->
+                </div>
+
+                <button class="btn-primary" id="btn-next-step1" style="display: none;">التالي</button>
+            </div>
+
+            <!-- مرحلة 2: البيانات -->
+            <div id="step-details" style="display: none;">
+                <h2 class="header-title">تفاصيل الحجز</h2>
+                <div class="status-box">
+                    <p id="selected-datetime-display" style="font-weight: bold; text-align: center; color: var(--primary);"></p>
+                </div>
+                
+                <div class="input-group">
+                    <label>الاسم الكامل</label>
+                    <input type="text" id="book-name" placeholder="اكتب اسمك الثلاثي">
+                </div>
+                <div class="input-group">
+                    <label>رقم الهاتف (11 رقم)</label>
+                    <input type="tel" id="book-phone" placeholder="مثال: 07700000000" maxlength="11">
+                </div>
+
+                <button class="btn-primary" id="btn-submit-booking">تأكيد وإرسال</button>
+                <button class="btn-primary" id="btn-back-step1" style="background: #95a5a6; margin-top: 10px;">رجوع</button>
+            </div>
+
+            <!-- مرحلة 3: قيد الانتظار -->
+            <div id="step-pending" class="status-screen">
+                <i class="fas fa-clock status-icon pending"></i>
+                <h2 style="color: var(--text-dark);">قيد المراجعة</h2>
+                <div class="status-box">
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">تم ارسال الحجز الخاص بك الى صاحب الملعب</p>
+                    <p>للتاكيد اتصل بلرقم:</p>
+                    <h3 style="color: var(--primary); margin: 10px 0; font-size: 1.5rem;">07773847800</h3>
+                    <span class="warning-text">(اذا لم تتصل وتقوم بتاكيد الحجز من صاحب الملعب لم يتم تاكيد حجزك)</span>
+                </div>
+            </div>
+
+            <!-- مرحلة 4: تمت الموافقة -->
+            <div id="step-approved" class="status-screen">
+                <i class="fas fa-check-circle status-icon approved"></i>
+                <h2 style="color: var(--secondary);">تمت الموافقة</h2>
+                <p style="margin-top: 15px; font-weight: bold;">قم بالقدوم الى الملعب قبل 5-10 دقائق من الموعد.</p>
+                
+                <div class="status-box" style="text-align: right;">
+                    <h4 style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px;">تذكرة الحجز:</h4>
+                    <div class="booking-card-row"><span class="b-label">الاسم:</span><span class="b-val" id="tk-name"></span></div>
+                    <div class="booking-card-row"><span class="b-label">اليوم:</span><span class="b-val" id="tk-date"></span></div>
+                    <div class="booking-card-row"><span class="b-label">الساعة:</span><span class="b-val" id="tk-time"></span></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- قسم حسابي (View) -->
+        <div id="view-account" class="page-container">
+            <h2 class="header-title" style="position: relative;">
+                حسابي
+                <div class="secret-login-btn" id="secret-login-trigger"></div> <!-- الزر المخفي -->
+            </h2>
+            
+            <div class="account-buttons">
+                <div class="acc-btn" onclick="openFreePage('page-my-bookings')">
+                    <div><i class="fas fa-history left" style="margin-left: 10px;"></i> حجوزاتي السابقة</div>
+                    <i class="fas fa-chevron-left right"></i>
+                </div>
+                
+                <div class="acc-btn" onclick="openFreePage('page-rating')">
+                    <div><i class="fas fa-star left" style="margin-left: 10px;"></i> تقييم الملعب</div>
+                    <i class="fas fa-chevron-left right"></i>
+                </div>
+
+                <a href="https://t.me/mslmr19" class="acc-btn" target="_blank">
+                    <div><i class="fab fa-telegram left" style="margin-left: 10px; color: #3498db;"></i> التواصل مع الدعم</div>
+                    <i class="fas fa-external-link-alt right"></i>
+                </a>
+
+                <!-- يظهر فقط للمالك -->
+                <div class="acc-btn admin-only" id="btn-admin-dash" onclick="openFreePage('page-admin-dash')">
+                    <div><i class="fas fa-cogs left" style="margin-left: 10px; color: white;"></i> لوحة التحكم</div>
+                    <i class="fas fa-chevron-left right" style="color: white;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- الشريط السفلي -->
+        <div class="bottom-bar">
+            <div class="nav-item active" onclick="switchMainTab('booking')">
+                <i class="fas fa-calendar-check"></i>
+                <span>الحجز</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('account')">
+                <i class="fas fa-user"></i>
+                <span>حسابي</span>
+                <div class="notification-dot" id="nav-badge"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= الصفحات الحرة (تفتح فوق التطبيق) ================= -->
+
+    <!-- صفحة حجوزاتي السابقة -->
+    <div id="page-my-bookings" class="free-page">
+        <div class="free-page-header">
+            <button class="back-btn" onclick="closeFreePage('page-my-bookings')"><i class="fas fa-arrow-right"></i></button>
+            <div class="free-page-title">حجوزاتي السابقة</div>
+        </div>
+        <div id="my-bookings-list">
+            <!-- Data from JS -->
+        </div>
+    </div>
+
+    <!-- صفحة تقييم الملعب -->
+    <div id="page-rating" class="free-page">
+        <div class="free-page-header">
+            <button class="back-btn" onclick="closeFreePage('page-rating')"><i class="fas fa-arrow-right"></i></button>
+            <div class="free-page-title">تقييم الملعب</div>
+        </div>
+        <div style="text-align: center; margin-top: 30px;">
+            <h3>ما رأيك في ملعب الصقور؟</h3>
+            <div class="star-rating" id="star-rating">
+                <i class="fas fa-star star" data-val="1"></i>
+                <i class="fas fa-star star" data-val="2"></i>
+                <i class="fas fa-star star" data-val="3"></i>
+                <i class="fas fa-star star" data-val="4"></i>
+                <i class="fas fa-star star" data-val="5"></i>
+            </div>
+            <div class="input-group">
+                <textarea id="rating-note" rows="4" placeholder="اكتب ملاحظتك هنا (اختياري)..."></textarea>
+            </div>
+            <button class="btn-primary" id="btn-submit-rating">إرسال التقييم</button>
+        </div>
+    </div>
+
+    <!-- صفحة لوحة التحكم (للمالك) -->
+    <div id="page-admin-dash" class="free-page">
+        <div class="free-page-header">
+            <button class="back-btn" onclick="closeFreePage('page-admin-dash')"><i class="fas fa-arrow-right"></i></button>
+            <div class="free-page-title">لوحة التحكم</div>
+        </div>
+        <div class="dashboard-grid">
+            <div class="dash-box" onclick="openFreePage('page-admin-bookings')">
+                <i class="fas fa-clipboard-list"></i>
+                <span>مراجعة الحجوزات</span>
+                <div class="notification-dot" style="position:static; display:none; margin-top:5px;" id="dash-badge-book"></div>
+            </div>
+            <div class="dash-box" onclick="openFreePage('page-admin-ratings')">
+                <i class="fas fa-star-half-alt"></i>
+                <span>تقييمات الملعب</span>
+            </div>
+            <div class="dash-box" onclick="alert('ملعب الصقور - لوحة الإدارة تعمل بنجاح')">
+                <i class="fas fa-info-circle"></i>
+                <span>معلومات</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- مراجعة الحجوزات (للمالك) -->
+    <div id="page-admin-bookings" class="free-page">
+        <div class="free-page-header">
+            <button class="back-btn" onclick="closeFreePage('page-admin-bookings')"><i class="fas fa-arrow-right"></i></button>
+            <div class="free-page-title">الطلبات المعلقة</div>
+        </div>
+        <div id="admin-bookings-list">
+            <!-- Data -->
+        </div>
+    </div>
+
+    <!-- تقييمات الملعب (للمالك) -->
+    <div id="page-admin-ratings" class="free-page">
+        <div class="free-page-header">
+            <button class="back-btn" onclick="closeFreePage('page-admin-ratings')"><i class="fas fa-arrow-right"></i></button>
+            <div class="free-page-title">آراء الزبائن</div>
+        </div>
+        <div id="admin-ratings-list">
+            <!-- Data -->
+        </div>
+    </div>
+
+    <!-- ================= نافذة تسجيل دخول المالك ================= -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="login-modal">
+            <i class="fas fa-times close-modal" onclick="document.getElementById('login-modal').style.display='none'"></i>
+            <h3 style="margin-bottom: 20px; color: var(--primary);">دخول المالك</h3>
+            <div class="input-group" style="text-align: right;">
+                <label>البريد الإلكتروني</label>
+                <input type="email" id="admin-email" placeholder="example@gmail.com">
+            </div>
+            <div class="input-group" style="text-align: right;">
+                <label>كلمة المرور</label>
+                <input type="password" id="admin-pass" placeholder="******">
+            </div>
+            <button class="btn-primary" id="btn-admin-login">تسجيل الدخول / إنشاء</button>
+        </div>
+    </div>
+
+    <!-- ================= Firebase & Logic ================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getDatabase, ref, push, set, onValue, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCcv3bjlRVl4buBLBkcccujqsgSF2lWoYY",
+            authDomain: "intelligence-e345d.firebaseapp.com",
+            databaseURL: "https://intelligence-e345d-default-rtdb.firebaseio.com",
+            projectId: "intelligence-e345d",
+            storageBucket: "intelligence-e345d.firebasestorage.app",
+            messagingSenderId: "210940387886",
+            appId: "1:210940387886:web:2c966266762c58077135bf"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        const ADMIN_EMAIL = "mslmalmyaly223@gmail.com";
+        let currentUser = null;
+        let isAdmin = false;
+        
+        let selectedDateStr = "";
+        let selectedTimeStr = "";
+        let allApprovedBookings = {};
+
+        // --- توقيت العراق الدقيق ---
+        function getIraqDateObj() {
+            // تحويل وقت النظام إلى وقت بغداد ثم استخراج كائن Date
+            let iqTime = new Date().toLocaleString("en-US", {timeZone: "Asia/Baghdad"});
+            return new Date(iqTime);
+        }
+
+        function formatDate(dateObj) {
+            let d = dateObj.getDate().toString().padStart(2, '0');
+            let m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+            let y = dateObj.getFullYear();
+            return `${y}-${m}-${d}`;
+        }
+
+        // --- تشغيل الأنميشن وتكوين الحساب الوهمي ---
+        setTimeout(() => {
+            signInAnonymously(auth).then(() => {
+                document.getElementById('splash-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splash-screen').style.display = 'none';
+                    document.getElementById('app-container').style.display = 'block';
+                    initApp();
+                }, 800);
+            }).catch((error) => {
+                alert("حدث خطأ في الاتصال بالسيرفر. تأكد من الانترنت.");
+            });
+        }, 4000);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                isAdmin = (user.email === ADMIN_EMAIL);
+                if (isAdmin) {
+                    document.getElementById('btn-admin-dash').style.display = 'flex';
+                } else {
+                    document.getElementById('btn-admin-dash').style.display = 'none';
+                }
+                listenToMyBookings();
+                if(isAdmin) listenToAdminData();
+            }
+        });
+
+        // --- واجهة المستخدم (Tabs & Pages) ---
+        window.switchMainTab = function(tab) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.page-container').forEach(el => el.classList.remove('active'));
+            
+            if(tab === 'booking') {
+                document.querySelectorAll('.nav-item')[0].classList.add('active');
+                document.getElementById('view-booking').classList.add('active');
+            } else {
+                document.querySelectorAll('.nav-item')[1].classList.add('active');
+                document.getElementById('view-account').classList.add('active');
+            }
+        }
+
+        window.openFreePage = function(id) {
+            document.getElementById(id).style.display = 'block';
+        }
+        window.closeFreePage = function(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // --- توليد الأيام والساعات (توقيت العراق) ---
+        function initApp() {
+            generateDates();
+            listenToApprovedBookings();
+        }
+
+        function generateDates() {
+            const slider = document.getElementById('date-slider');
+            slider.innerHTML = '';
+            
+            const daysName = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+            const today = getIraqDateObj();
+
+            for(let i=0; i<7; i++) {
+                let targetDate = new Date(today);
+                targetDate.setDate(today.getDate() + i);
+                
+                let dateStr = formatDate(targetDate);
+                let dayName = i === 0 ? "اليوم" : daysName[targetDate.getDay()];
+                
+                let card = document.createElement('div');
+                card.className = 'date-card';
+                card.innerHTML = `<div class="day-name">${dayName}</div><div class="day-num">${targetDate.getDate()}</div>`;
+                
+                card.onclick = () => {
+                    document.querySelectorAll('.date-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    selectedDateStr = dateStr;
+                    selectedTimeStr = "";
+                    document.getElementById('btn-next-step1').style.display = 'none';
+                    generateTimes(dateStr);
+                };
+                
+                slider.appendChild(card);
+                if(i===0) card.click(); // Select today by default
+            }
+        }
+
+        function generateTimes(dateStr) {
+            const grid = document.getElementById('time-grid');
+            grid.innerHTML = '';
+            
+            const todayObj = getIraqDateObj();
+            const isToday = (dateStr === formatDate(todayObj));
+            const currentHour = todayObj.getHours(); // 0-23
+
+            // من 12 صباحا (0) الى 11 مساء (23) -> أقصى شيء 12 حسب طلبك (1-12)
+            // سنولد الفترات: 12ص, 1ص, ... 11م (24 ساعة)
+            
+            for(let h=0; h<24; h++) {
+                // منع الأوقات الماضية في نفس اليوم
+                if(isToday && h <= currentHour) continue;
+
+                let displayHour = h % 12 || 12;
+                let ampm = h < 12 ? 'ص' : 'م';
+                let timeLabel = `${displayHour}${ampm}`;
+                let slotKey = `${dateStr}_${timeLabel}`;
+
+                let slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.innerText = timeLabel;
+
+                // فحص إذا كانت الساعة محجوزة (وموافق عليها)
+                let isBooked = false;
+                for(let key in allApprovedBookings) {
+                    let b = allApprovedBookings[key];
+                    if(b.date === dateStr && b.time === timeLabel && b.status === 'approved') {
+                        isBooked = true; break;
+                    }
+                }
+
+                if(isBooked) {
+                    slot.classList.add('booked');
+                } else {
+                    slot.onclick = () => {
+                        document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('active'));
+                        slot.classList.add('active');
+                        selectedTimeStr = timeLabel;
+                        document.getElementById('btn-next-step1').style.display = 'block';
+                    };
+                }
+                grid.appendChild(slot);
+            }
+        }
+
+        // جلب الحجوزات لمعرفة الأوقات المقفلة
+        function listenToApprovedBookings() {
+            const bookingsRef = ref(db, 'bookings');
+            onValue(bookingsRef, (snapshot) => {
+                allApprovedBookings = snapshot.val() || {};
+                if(selectedDateStr) generateTimes(selectedDateStr); // تحديث الواجهة فوراً
+            });
+        }
+
+        // --- التنقل بين خطوات الحجز ---
+        document.getElementById('btn-next-step1').onclick = () => {
+            if(!selectedDateStr || !selectedTimeStr) return;
+            document.getElementById('step-datetime').style.display = 'none';
+            document.getElementById('step-details').style.display = 'block';
+            document.getElementById('selected-datetime-display').innerText = `الموعد: ${selectedDateStr} | الساعة: ${selectedTimeStr}`;
+        };
+
+        document.getElementById('btn-back-step1').onclick = () => {
+            document.getElementById('step-details').style.display = 'none';
+            document.getElementById('step-datetime').style.display = 'block';
+        };
+
+        // --- إرسال الحجز ---
+        document.getElementById('btn-submit-booking').onclick = () => {
+            let name = document.getElementById('book-name').value.trim();
+            let phone = document.getElementById('book-phone').value.trim();
+
+            if(name.length < 3) return alert("يرجى كتابة الاسم بشكل صحيح");
+            if(phone.length !== 11 || isNaN(phone)) return alert("رقم الهاتف يجب أن يتكون من 11 رقم حصراً");
+
+            const bookingData = {
+                uid: currentUser.uid,
+                name: name,
+                phone: phone,
+                date: selectedDateStr,
+                time: selectedTimeStr,
+                status: 'pending',
+                timestamp: Date.now()
+            };
+
+            const newBookingRef = push(ref(db, 'bookings'));
+            set(newBookingRef, bookingData).then(() => {
+                document.getElementById('step-details').style.display = 'none';
+                document.getElementById('step-pending').style.display = 'block';
+                document.getElementById('book-name').value = '';
+                document.getElementById('book-phone').value = '';
+            });
+        };
+
+        // --- مراقبة حالة حجز المستخدم الحالي ---
+        function listenToMyBookings() {
+            if(!currentUser) return;
+            const bookingsRef = ref(db, 'bookings');
+            onValue(bookingsRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                let myActiveBooking = null;
+                let myHistoryHtml = '';
+                
+                let todayObj = getIraqDateObj();
+                let todayStr = formatDate(todayObj);
+
+                for(let key in data) {
+                    let b = data[key];
+                    if(b.uid === currentUser.uid) {
+                        
+                        // بناء سجل الحجوزات السابقة
+                        let statusText = b.status === 'pending' ? 'قيد الانتظار' : (b.status === 'approved' ? 'مقبول' : 'مرفوض');
+                        myHistoryHtml += `
+                            <div class="booking-card ${b.status}">
+                                <div class="booking-card-row"><span class="b-label">اليوم:</span><span class="b-val">${b.date}</span></div>
+                                <div class="booking-card-row"><span class="b-label">الساعة:</span><span class="b-val">${b.time}</span></div>
+                                <div class="booking-card-row"><span class="b-label">الحالة:</span><span class="b-val">${statusText}</span></div>
+                            </div>
+                        `;
+
+                        // فحص هل لديه حجز فعال اليوم يعرض في الشاشات
+                        // إذا كان قيد الانتظار نعرض شاشة الانتظار، إذا مقبول نعرض الموافقة.
+                        // الشاشة تختفي إذا مر الوقت
+                        
+                        // تحويل الوقت المحجوز إلى رقم للمقارنة
+                        let isPast = false;
+                        if(b.date < todayStr) isPast = true;
+                        if(b.date === todayStr) {
+                            let match = b.time.match(/(\d+)(ص|م)/);
+                            if(match) {
+                                let h = parseInt(match[1]);
+                                let ampm = match[2];
+                                if(h===12 && ampm==='ص') h = 0;
+                                else if(h<12 && ampm==='م') h += 12;
+                                
+                                // يختفي بعد انتهاء الساعة المحجوزة
+                                if(todayObj.getHours() > h) isPast = true; 
+                            }
+                        }
+
+                        if(!isPast && (b.status === 'pending' || b.status === 'approved')) {
+                            myActiveBooking = b;
+                        }
+                    }
+                }
+
+                document.getElementById('my-bookings-list').innerHTML = myHistoryHtml || '<p style="text-align:center;">لا توجد حجوزات سابقة</p>';
+
+                // التحكم بظهور شاشات (الحجز / قيد الانتظار / موافقة)
+                const sTime = document.getElementById('step-datetime');
+                const sDet = document.getElementById('step-details');
+                const sPen = document.getElementById('step-pending');
+                const sApp = document.getElementById('step-approved');
+
+                // تصفير العرض
+                sDet.style.display = 'none';
+
+                if(myActiveBooking) {
+                    sTime.style.display = 'none';
+                    if(myActiveBooking.status === 'pending') {
+                        sPen.style.display = 'block';
+                        sApp.style.display = 'none';
+                    } else if(myActiveBooking.status === 'approved') {
+                        sPen.style.display = 'none';
+                        sApp.style.display = 'block';
+                        document.getElementById('tk-name').innerText = myActiveBooking.name;
+                        document.getElementById('tk-date').innerText = myActiveBooking.date;
+                        document.getElementById('tk-time').innerText = myActiveBooking.time;
+                    }
+                } else {
+                    // الرجوع للوضع الطبيعي للحجز
+                    sTime.style.display = 'block';
+                    sPen.style.display = 'none';
+                    sApp.style.display = 'none';
+                }
+            });
+        }
+
+
+        // --- نظام التقييم ---
+        let currentRating = 5;
+        document.querySelectorAll('.star').forEach(star => {
+            star.onclick = function() {
+                currentRating = this.getAttribute('data-val');
+                document.querySelectorAll('.star').forEach(s => {
+                    if(s.getAttribute('data-val') <= currentRating) s.classList.add('active');
+                    else s.classList.remove('active');
+                });
+            };
+        });
+        
+        // تفعيل النجوم كبداية
+        document.querySelector('.star[data-val="5"]').click();
+
+        document.getElementById('btn-submit-rating').onclick = () => {
+            let note = document.getElementById('rating-note').value.trim();
+            const ratingData = {
+                stars: currentRating,
+                note: note,
+                timestamp: Date.now()
+            };
+            push(ref(db, 'ratings'), ratingData).then(() => {
+                alert("شكراً لك! تم إرسال تقييمك للمالك بنجاح.");
+                closeFreePage('page-rating');
+                document.getElementById('rating-note').value = '';
+            });
+        };
+
+
+        // --- تسجيل دخول المالك (الزر السري) ---
+        document.getElementById('secret-login-trigger').onclick = () => {
+            document.getElementById('login-modal').style.display = 'flex';
+        };
+
+        document.getElementById('btn-admin-login').onclick = () => {
+            const email = document.getElementById('admin-email').value.trim();
+            const pass = document.getElementById('admin-pass').value;
+            
+            if(email !== ADMIN_EMAIL) return alert("هذا البريد غير مصرح له.");
+
+            // محاولة تسجيل الدخول، وإن فشل لعدم وجود الحساب نقوم بإنشائه
+            signInWithEmailAndPassword(auth, email, pass).then(() => {
+                document.getElementById('login-modal').style.display = 'none';
+                alert("تم تسجيل الدخول كمالك بنجاح!");
+            }).catch(error => {
+                if(error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+                    createUserWithEmailAndPassword(auth, email, pass).then(() => {
+                        document.getElementById('login-modal').style.display = 'none';
+                        alert("تم إنشاء حساب المالك وتسجيل الدخول بنجاح!");
+                    }).catch(err => alert(err.message));
+                } else {
+                    alert(error.message);
+                }
+            });
+        };
+
+        // --- دوال المالك (لوحة التحكم والإشعارات) ---
+        function listenToAdminData() {
+            const bookingsRef = ref(db, 'bookings');
+            const ratingsRef = ref(db, 'ratings');
+
+            // مراقبة الحجوزات
+            onValue(bookingsRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                let adminBookingsHtml = '';
+                let pendingCount = 0;
+
+                for(let key in data) {
+                    let b = data[key];
+                    if(b.status === 'pending') {
+                        pendingCount++;
+                        adminBookingsHtml += `
+                            <div class="booking-card pending">
+                                <div class="booking-card-row"><span class="b-label">الاسم:</span><span class="b-val">${b.name}</span></div>
+                                <div class="booking-card-row"><span class="b-label">الرقم:</span><span class="b-val" style="direction:ltr;">${b.phone}</span></div>
+                                <div class="booking-card-row"><span class="b-label">الموعد:</span><span class="b-val">${b.date} | ${b.time}</span></div>
+                                <div class="admin-actions">
+                                    <button class="btn-acc" onclick="updateBookingStatus('${key}', 'approved')">قبول</button>
+                                    <button class="btn-rej" onclick="updateBookingStatus('${key}', 'rejected')">رفض</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                document.getElementById('admin-bookings-list').innerHTML = adminBookingsHtml || '<p style="text-align:center;">لا توجد طلبات معلقة</p>';
+                
+                // تحديث النقطة الحمراء
+                if(pendingCount > 0) {
+                    document.getElementById('nav-badge').style.display = 'block';
+                    document.getElementById('dash-badge-book').style.display = 'block';
+                } else {
+                    document.getElementById('nav-badge').style.display = 'none';
+                    document.getElementById('dash-badge-book').style.display = 'none';
+                }
+            });
+
+            // مراقبة التقييمات
+            onValue(ratingsRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                let ratingsHtml = '';
+                // تحويل لـ Array لترتيبها من الأحدث للأقدم
+                let rArray = [];
+                for(let key in data) rArray.push(data[key]);
+                rArray.sort((a,b) => b.timestamp - a.timestamp);
+
+                rArray.forEach(r => {
+                    let starsHtml = '';
+                    for(let i=0; i<5; i++) {
+                        starsHtml += `<i class="fas fa-star" style="color:${i < r.stars ? '#f1c40f' : '#ccc'};"></i>`;
+                    }
+                    ratingsHtml += `
+                        <div class="booking-card">
+                            <div style="margin-bottom:10px; font-size:1.2rem;">${starsHtml}</div>
+                            <p style="color:var(--text-dark);">${r.note || 'بدون ملاحظة'}</p>
+                        </div>
+                    `;
+                });
+                document.getElementById('admin-ratings-list').innerHTML = ratingsHtml || '<p style="text-align:center;">لا توجد تقييمات بعد</p>';
+            });
+        }
+
+        window.updateBookingStatus = function(key, newStatus) {
+            update(ref(db, 'bookings/' + key), { status: newStatus });
+        };
+
+    </script>
+</body>
+</html>

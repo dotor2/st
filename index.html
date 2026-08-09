@@ -307,9 +307,10 @@
                 <h2 style="color: var(--text-dark);">قيد المراجعة</h2>
                 <div class="status-box">
                     <p style="font-size: 1.1rem; margin-bottom: 10px;">تم إرسال الحجز الخاص بك إلى المالك</p>
-                    <p>للتأكيد يرجى الانتظار لحين مراجعة الطلب</p>
+                    <p>يرجى الانتظار بينما تتم الموافقة على الحجز من قبل المالك</p>
                     <p style="margin-top:10px;">للاستفسار اتصل بالرقم:</p>
-                    <h3 style="color: var(--primary); margin: 10px 0; font-size: 1.5rem;">07773847800</h3>
+                    <h3 style="color: var(--primary); margin: 10px 0; font-size: 1.5rem;">07813054554</h3>
+                    <p style="color: red; font-weight: bold; margin-top: 15px; font-size: 1rem;">( لقبول الحجز يرجى الاتصال برقم الهاتف اعلى وتاكيد الحجز مع المالك لتاكيد قبول الحجز خلاف ذالك سيتم رفضة )</p>
                 </div>
             </div>
 
@@ -510,7 +511,8 @@
                 <label>كلمة المرور</label>
                 <input type="password" id="admin-pass" placeholder="******">
             </div>
-            <button class="btn-primary" id="btn-admin-login">تسجيل الدخول</button>
+            <button class="btn-primary" id="btn-admin-login" style="margin-bottom: 10px;">تسجيل الدخول</button>
+            <button class="btn-primary" id="btn-admin-signup" style="background: var(--secondary);">إنشاء حساب</button>
         </div>
     </div>
 
@@ -538,7 +540,7 @@
         const auth = getAuth(app);
         const db = getDatabase(app);
 
-        const ADMIN_EMAIL = "mslmalmyaly223@gmail.com";
+        const ADMIN_EMAIL = "slwan@gmail.com";
         let currentUser = null;
         let isAdmin = false;
         
@@ -551,7 +553,7 @@
 
         let allBookings = {};
         let allFixedBookings = {};
-        let dismissedBookingKeys = [];
+        let dismissedBookingKeys = JSON.parse(localStorage.getItem('dismissedBookingKeys')) || [];
 
         const daysName = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
         let appReady = false;
@@ -676,7 +678,12 @@
             const isToday = (dateStr === formatDate(todayObj));
             const currentHour = todayObj.getHours();
 
-            for(let h=0; h<24; h++) {
+            let hoursOrder = [];
+            for(let i=1; i<24; i++) hoursOrder.push(i);
+            hoursOrder.push(0);
+
+            for(let i=0; i<hoursOrder.length; i++) {
+                let h = hoursOrder[i];
                 if(isToday && h <= currentHour) continue;
 
                 let displayHour = h % 12 || 12;
@@ -836,6 +843,7 @@
 
         window.dismissActiveBooking = function(key) {
             dismissedBookingKeys.push(key);
+            localStorage.setItem('dismissedBookingKeys', JSON.stringify(dismissedBookingKeys));
             document.getElementById('step-approved').style.display = 'none';
             document.getElementById('step-rejected').style.display = 'none';
             document.getElementById('step-stadium').style.display = 'block';
@@ -967,13 +975,23 @@
                 document.getElementById('login-modal').style.display = 'none';
                 alert("تم تسجيل الدخول كمالك بنجاح!");
             }).catch(error => {
-                if(error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-                    createUserWithEmailAndPassword(auth, email, pass).then(() => {
-                        document.getElementById('login-modal').style.display = 'none';
-                        alert("تم إنشاء حساب المالك وتسجيل الدخول بنجاح!");
-                    }).catch(err => alert(err.message));
+                alert("فشل تسجيل الدخول. تأكد من صحة البريد أو كلمة المرور.");
+            });
+        };
+
+        document.getElementById('btn-admin-signup').onclick = () => {
+            const email = document.getElementById('admin-email').value.trim();
+            const pass = document.getElementById('admin-pass').value;
+            if(email !== ADMIN_EMAIL) return alert("هذا البريد غير مصرح له.");
+
+            createUserWithEmailAndPassword(auth, email, pass).then(() => {
+                document.getElementById('login-modal').style.display = 'none';
+                alert("تم إنشاء حساب المالك بنجاح!");
+            }).catch(error => {
+                if(error.code === 'auth/email-already-in-use') {
+                    alert("هذا الحساب مسجل مسبقاً! يرجى استخدام زر تسجيل الدخول.");
                 } else {
-                    alert(error.message);
+                    alert("فشل إنشاء الحساب: " + error.message);
                 }
             });
         };
@@ -983,7 +1001,7 @@
             if(!match) return 0;
             let h = parseInt(match[1]);
             let ampm = match[2];
-            if(h===12 && ampm==='ص') return 0;
+            if(h===12 && ampm==='ص') return 24; 
             if(h<12 && ampm==='م') return h + 12;
             if(h===12 && ampm==='م') return 12;
             return h;
@@ -1083,7 +1101,12 @@
         function populateFixedTimeSelect() {
             const sel = document.getElementById('fixed-time');
             sel.innerHTML = '';
-            for(let h=0; h<24; h++) {
+            let hoursOrder = [];
+            for(let i=1; i<24; i++) hoursOrder.push(i);
+            hoursOrder.push(0);
+            
+            for(let i=0; i<hoursOrder.length; i++) {
+                let h = hoursOrder[i];
                 let displayHour = h % 12 || 12;
                 let ampm = h < 12 ? 'ص' : 'م';
                 let timeLabel = `${displayHour}${ampm}`;

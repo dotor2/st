@@ -450,8 +450,9 @@
     <div id="page-admin-today" class="free-page">
         <div class="free-page-header">
             <button class="back-btn" onclick="closeFreePage('page-admin-today')"><i class="fas fa-arrow-right"></i></button>
-            <div class="free-page-title">حجوزات اليوم المؤكدة</div>
+            <div class="free-page-title">إدارة الحجوزات المؤكدة</div>
         </div>
+        <div class="date-slider" id="admin-date-slider" style="margin-bottom: 20px;"></div>
         <div id="admin-today-list"></div>
     </div>
 
@@ -621,7 +622,17 @@
             }
         }
 
-        window.openFreePage = function(id) { document.getElementById(id).style.display = 'block'; }
+        window.openFreePage = function(id) { 
+            document.getElementById(id).style.display = 'block'; 
+            if(id === 'page-admin-today') {
+                if(!document.getElementById('admin-date-slider').hasChildNodes()){
+                    generateAdminDates();
+                } else {
+                    renderAdminApprovedBookings();
+                }
+            }
+        }
+        
         window.closeFreePage = function(id) { document.getElementById(id).style.display = 'none'; }
 
         window.selectStadium = function(stadiumName) {
@@ -674,21 +685,32 @@
             const grid = document.getElementById('time-grid');
             grid.innerHTML = '';
             
-            const todayObj = getIraqDateObj();
-            const isToday = (dateStr === formatDate(todayObj));
-            const currentHour = todayObj.getHours();
+            const now = getIraqDateObj();
+            const [y, m, d] = dateStr.split('-');
+            let baseDate = getIraqDateObj();
+            baseDate.setFullYear(y, m - 1, d);
+            baseDate.setHours(0, 0, 0, 0);
 
-            let hoursOrder = [];
-            for(let i=1; i<24; i++) hoursOrder.push(i);
-            hoursOrder.push(0);
+            let hoursOrder = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
             for(let i=0; i<hoursOrder.length; i++) {
                 let h = hoursOrder[i];
-                if(isToday && h <= currentHour) continue;
+                
+                let slotTime = new Date(baseDate.getTime());
+                slotTime.setHours(h, 0, 0, 0);
+                if(h < 12) {
+                    slotTime.setDate(slotTime.getDate() + 1);
+                }
+                if(slotTime <= now) continue;
 
                 let displayHour = h % 12 || 12;
-                let ampm = h < 12 ? 'ص' : 'م';
-                let timeLabel = `${displayHour}${ampm}`;
+                let suffix = '';
+                if(h >= 12 && h <= 17) suffix = 'ظهرا';
+                else if(h >= 18 && h <= 23) suffix = 'ليلا';
+                else if(h === 0) suffix = 'ليلا';
+                else if(h >= 1 && h <= 6) suffix = 'فجرا';
+                else if(h >= 7 && h <= 11) suffix = 'صباحا';
+                let timeLabel = `${displayHour} ${suffix}`;
 
                 let slot = document.createElement('div');
                 slot.className = 'time-slot';
@@ -736,7 +758,12 @@
             onValue(ref(db, 'bookings'), (snapshot) => {
                 allBookings = snapshot.val() || {};
                 if(selectedDateStr) generateTimes(selectedDateStr, selectedDayOfWeek);
-                if(isAdmin) renderAdminBookings();
+                if(isAdmin) {
+                    renderAdminBookings();
+                    if(document.getElementById('page-admin-today').style.display === 'block') {
+                        renderAdminApprovedBookings();
+                    }
+                }
             });
             
             if(isAdmin) {
@@ -873,16 +900,16 @@
                         `;
 
                         let isPast = false;
-                        if(b.date < todayStr) isPast = true;
-                        if(b.date === todayStr) {
-                            let match = b.time.match(/(\d+)(ص|م)/);
-                            if(match) {
-                                let h = parseInt(match[1]);
-                                let ampm = match[2];
-                                if(h===12 && ampm==='ص') h = 0;
-                                else if(h<12 && ampm==='م') h += 12;
-                                if(todayObj.getHours() > h) isPast = true; 
+                        let h = getHourNum(b.time);
+                        let bDateParts = b.date.split('-');
+                        if(bDateParts.length === 3) {
+                            let bSlotTime = getIraqDateObj();
+                            bSlotTime.setFullYear(bDateParts[0], bDateParts[1] - 1, bDateParts[2]);
+                            bSlotTime.setHours(h, 0, 0, 0);
+                            if(h < 12) {
+                                bSlotTime.setDate(bSlotTime.getDate() + 1);
                             }
+                            if(bSlotTime <= todayObj) isPast = true;
                         }
 
                         if(!isPast && (b.status === 'pending' || b.status === 'approved' || b.status === 'rejected')) {
@@ -997,24 +1024,23 @@
         };
 
         function getHourNum(timeStr) {
-            let match = timeStr.match(/(\d+)(ص|م)/);
+            let match = timeStr.match(/(\d+)\s*(ظهرا|ليلا|فجرا|صباحا)/);
             if(!match) return 0;
             let h = parseInt(match[1]);
-            let ampm = match[2];
-            if(h===12 && ampm==='ص') return 24; 
-            if(h<12 && ampm==='م') return h + 12;
-            if(h===12 && ampm==='م') return 12;
+            let suffix = match[2];
+            if(h === 12 && suffix === 'ليلا') return 0;
+            if(h === 12 && suffix === 'ظهرا') return 12;
+            if(suffix === 'ظهرا' && h < 12) return h + 12;
+            if(suffix === 'ليلا' && h < 12) return h + 12;
+            if(suffix === 'فجرا') return h;
+            if(suffix === 'صباحا') return h;
             return h;
         }
 
         function renderAdminBookings() {
             let adminBookingsHtml = '';
-            let todayHtml = '';
             let pendingCount = 0;
             
-            let todayStr = formatDate(getIraqDateObj());
-            let todayBookingsArray = [];
-
             for(let key in allBookings) {
                 let b = allBookings[key];
                 
@@ -1038,28 +1064,9 @@
                         </div>
                     `;
                 }
-
-                if(b.status === 'approved' && b.date === todayStr) {
-                    todayBookingsArray.push(b);
-                }
             }
 
-            todayBookingsArray.sort((a,b) => getHourNum(a.time) - getHourNum(b.time));
-            todayBookingsArray.forEach(b => {
-                let payText = b.payMethod === 'electronic' ? 'الكتروني' : 'نقدي';
-                todayHtml += `
-                    <div class="booking-card approved" style="border-right-color: var(--secondary);">
-                        <div class="booking-card-row"><span class="b-label">الوقت:</span><span class="b-val" style="color:var(--secondary); font-size:1.1rem;">${b.time}</span></div>
-                        <div class="booking-card-row"><span class="b-label">الملعب:</span><span class="b-val">${b.stadium}</span></div>
-                        <div class="booking-card-row"><span class="b-label">الاسم:</span><span class="b-val">${b.name}</span></div>
-                        <div class="booking-card-row"><span class="b-label">الرقم:</span><span class="b-val" style="direction:ltr;">${b.phone}</span></div>
-                        <div class="booking-card-row"><span class="b-label">الدفع:</span><span class="b-val">${payText}</span></div>
-                    </div>
-                `;
-            });
-
             document.getElementById('admin-bookings-list').innerHTML = adminBookingsHtml || '<p style="text-align:center;">لا توجد طلبات معلقة</p>';
-            document.getElementById('admin-today-list').innerHTML = todayHtml || '<p style="text-align:center;">لا توجد حجوزات مؤكدة لهذا اليوم</p>';
             
             if(pendingCount > 0) {
                 document.getElementById('nav-badge').style.display = 'block';
@@ -1101,15 +1108,18 @@
         function populateFixedTimeSelect() {
             const sel = document.getElementById('fixed-time');
             sel.innerHTML = '';
-            let hoursOrder = [];
-            for(let i=1; i<24; i++) hoursOrder.push(i);
-            hoursOrder.push(0);
+            let hoursOrder = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
             
             for(let i=0; i<hoursOrder.length; i++) {
                 let h = hoursOrder[i];
                 let displayHour = h % 12 || 12;
-                let ampm = h < 12 ? 'ص' : 'م';
-                let timeLabel = `${displayHour}${ampm}`;
+                let suffix = '';
+                if(h >= 12 && h <= 17) suffix = 'ظهرا';
+                else if(h >= 18 && h <= 23) suffix = 'ليلا';
+                else if(h === 0) suffix = 'ليلا';
+                else if(h >= 1 && h <= 6) suffix = 'فجرا';
+                else if(h >= 7 && h <= 11) suffix = 'صباحا';
+                let timeLabel = `${displayHour} ${suffix}`;
                 sel.innerHTML += `<option value="${timeLabel}">${timeLabel}</option>`;
             }
         }
@@ -1123,7 +1133,7 @@
             push(ref(db, 'fixed_bookings'), fbData).then(() => {
                 alert("تمت إضافة الحجز الثابت بنجاح");
             });
-        }  
+        }
 
         function renderAdminFixedBookings() {
             let html = '';
@@ -1144,6 +1154,71 @@
         window.deleteFixedBooking = function(key) {
             if(confirm("هل أنت متأكد من حذف هذا الحجز الثابت؟")) {
                 remove(ref(db, 'fixed_bookings/' + key));
+            }
+        }
+        
+        let adminSelectedDateStr = "";
+
+        function generateAdminDates() {
+            const slider = document.getElementById('admin-date-slider');
+            slider.innerHTML = '';
+            const today = getIraqDateObj();
+            for(let i=0; i<7; i++) {
+                let targetDate = new Date(today);
+                targetDate.setDate(today.getDate() + i);
+                let dateStr = formatDate(targetDate);
+                let dayName = i === 0 ? "اليوم" : daysName[targetDate.getDay()];
+                
+                let card = document.createElement('div');
+                card.className = 'date-card';
+                card.innerHTML = `<div class="day-name">${dayName}</div><div class="day-num">${targetDate.getDate()}</div>`;
+                
+                card.onclick = () => {
+                    document.querySelectorAll('#admin-date-slider .date-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    adminSelectedDateStr = dateStr;
+                    renderAdminApprovedBookings();
+                };
+                slider.appendChild(card);
+                if(i===0) card.click();
+            }
+        }
+        
+        window.renderAdminApprovedBookings = function() {
+            if(!adminSelectedDateStr) return;
+            let listHtml = '';
+            let targetBookings = [];
+            
+            for(let key in allBookings) {
+                let b = allBookings[key];
+                if(b.status === 'approved' && b.date === adminSelectedDateStr) {
+                    targetBookings.push({key: key, data: b});
+                }
+            }
+            
+            targetBookings.sort((a,b) => getHourNum(a.data.time) - getHourNum(b.data.time));
+            
+            targetBookings.forEach(item => {
+                let b = item.data;
+                let payText = b.payMethod === 'electronic' ? 'الكتروني' : 'نقدي';
+                listHtml += `
+                    <div class="booking-card approved" style="border-right-color: var(--secondary);">
+                        <div class="booking-card-row"><span class="b-label">الوقت:</span><span class="b-val" style="color:var(--secondary); font-size:1.1rem;">${b.time}</span></div>
+                        <div class="booking-card-row"><span class="b-label">الملعب:</span><span class="b-val">${b.stadium}</span></div>
+                        <div class="booking-card-row"><span class="b-label">الاسم:</span><span class="b-val">${b.name}</span></div>
+                        <div class="booking-card-row"><span class="b-label">الرقم:</span><span class="b-val" style="direction:ltr;">${b.phone}</span></div>
+                        <div class="booking-card-row"><span class="b-label">الدفع:</span><span class="b-val">${payText}</span></div>
+                        <button class="btn-rej" style="width:100%; margin-top:10px;" onclick="cancelApprovedBooking('${item.key}')">إلغاء الحجز</button>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('admin-today-list').innerHTML = listHtml || '<p style="text-align:center;">لا توجد حجوزات مؤكدة لهذا اليوم</p>';
+        }
+
+        window.cancelApprovedBooking = function(key) {
+            if(confirm("هل أنت متأكد من إلغاء هذا الحجز؟ سيتمكن الآخرون من حجزه مجدداً.")) {
+                update(ref(db, 'bookings/' + key), { status: 'rejected' });
             }
         }
 

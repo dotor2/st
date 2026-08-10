@@ -685,7 +685,6 @@
             const grid = document.getElementById('time-grid');
             grid.innerHTML = '';
             
-            const now = getIraqDateObj();
             const [y, m, d] = dateStr.split('-');
             let baseDate = getIraqDateObj();
             baseDate.setFullYear(y, m - 1, d);
@@ -696,13 +695,6 @@
             for(let i=0; i<hoursOrder.length; i++) {
                 let h = hoursOrder[i];
                 
-                let slotTime = new Date(baseDate.getTime());
-                slotTime.setHours(h, 0, 0, 0);
-                if(h < 12) {
-                    slotTime.setDate(slotTime.getDate() + 1);
-                }
-                if(slotTime <= now) continue;
-
                 let displayHour = h % 12 || 12;
                 let suffix = '';
                 if(h >= 12 && h <= 17) suffix = 'ظهرا';
